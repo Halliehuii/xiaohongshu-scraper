@@ -1,5 +1,5 @@
 from fastapi import FastAPI, BackgroundTasks, HTTPException
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, HTMLResponse, RedirectResponse
 from pydantic import BaseModel, Field
 import uvicorn
 import os
@@ -63,10 +63,79 @@ def shutdown_event():
     if scraper:
         scraper.close()
 
+# 根路径路由 - 重定向到文档页面
+@app.get("/", response_class=RedirectResponse)
+async def root():
+    return RedirectResponse(url="/docs")
+
+# 欢迎页面
+@app.get("/welcome", response_class=HTMLResponse)
+async def welcome():
+    html_content = """
+    <!DOCTYPE html>
+    <html>
+        <head>
+            <title>小红书内容抓取API</title>
+            <style>
+                body {
+                    font-family: Arial, sans-serif;
+                    max-width: 800px;
+                    margin: 0 auto;
+                    padding: 20px;
+                    line-height: 1.6;
+                }
+                h1 {
+                    color: #FF2442; /* 小红书红色 */
+                }
+                .endpoints {
+                    background-color: #f5f5f5;
+                    padding: 15px;
+                    border-radius: 5px;
+                    margin: 20px 0;
+                }
+                code {
+                    background-color: #eee;
+                    padding: 2px 5px;
+                    border-radius: 3px;
+                }
+                a {
+                    color: #FF2442;
+                    text-decoration: none;
+                }
+                a:hover {
+                    text-decoration: underline;
+                }
+            </style>
+        </head>
+        <body>
+            <h1>小红书内容抓取API</h1>
+            <p>这是一个用于抓取小红书帖子内容和图片的API服务。</p>
+            
+            <div class="endpoints">
+                <h2>可用端点：</h2>
+                <ul>
+                    <li><code>GET /health</code> - 健康检查</li>
+                    <li><code>POST /login</code> - 登录小红书</li>
+                    <li><code>POST /scrape</code> - 抓取帖子内容</li>
+                </ul>
+            </div>
+            
+            <p>查看API文档：</p>
+            <ul>
+                <li><a href="/docs">Swagger UI</a></li>
+                <li><a href="/redoc">ReDoc</a></li>
+            </ul>
+            
+            <p>请先使用 <code>POST /login</code> 端点登录，然后再使用 <code>POST /scrape</code> 端点抓取内容。</p>
+        </body>
+    </html>
+    """
+    return html_content
+
 # 健康检查端点
 @app.get("/health")
 def health_check():
-    return {"status": "ok"}
+    return {"status": "ok", "timestamp": time.time()}
 
 # 提取URL的辅助函数
 def process_url(url_text):
