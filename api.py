@@ -1,224 +1,62 @@
-from fastapi import FastAPI, BackgroundTasks, HTTPException
-from fastapi.responses import JSONResponse, HTMLResponse, RedirectResponse
-from pydantic import BaseModel, Field
+from fastapi import FastAPI, HTTPException, Request
 import uvicorn
-import os
-import threading
-from typing import List, Optional
-import time
+from pydantic import BaseModel
 import json
-import re
+from typing import Optional, Dict, Any, List
+from fastapi.middleware.cors import CORSMiddleware
 
-# 导入原脚本中的爬虫类
-from xiaohongshu_scraper import XiaohongshuScraper, extract_xiaohongshu_url
+from transform_xhs import extract_xhs_content
 
-app = FastAPI(
-    title="小红书内容抓取API",
-    description="基于Selenium的小红书内容抓取API，支持抓取帖子内容和图片",
-    version="1.0.0"
+app = FastAPI()
+
+# 添加 CORS 中间件
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],  # 允许所有来源，生产环境建议设置为特定域名
+    allow_credentials=True,
+    allow_methods=["*"],  # 允许所有方法
+    allow_headers=["*"],  # 允许所有头部
 )
 
-# 创建一个全局的爬虫实例和锁，确保多个请求之间不会冲突
-scraper = None
-scraper_lock = threading.Lock()
-
-# 定义请求模型
-class ScrapeRequest(BaseModel):
-    url: str = Field(..., description="小红书帖子URL或分享文本")
-    save_to_json: bool = Field(False, description="是否保存元数据到JSON文件")
-
-# 定义响应模型
-class ImageInfo(BaseModel):
+class XHSRequest(BaseModel):
     url: str
-    local_path: Optional[str] = None
 
-class ScrapeResponse(BaseModel):
+class XHSResponse(BaseModel):
     title: str
-    content: str
-    image_count: int
-    image_info: List[ImageInfo]
-    output_directory: Optional[str] = None
-    success: bool
-    message: str
+    description: str
+    type: str
+    images: List[Dict[str, Any]]
+    original_url: str
 
-# 初始化爬虫
-def init_scraper():
-    global scraper
-    if scraper is None:
-        with scraper_lock:
-            if scraper is None:  # 双重检查锁定
-                scraper = XiaohongshuScraper()
-                # 创建主输出目录
-                os.makedirs('xiaohongshu_posts', exist_ok=True)
+@app.get("/")
+def root():
+    """Root endpoint for Vercel"""
+    return {"message": "欢迎使用小红书内容提取 API", "version": "1.0.0"}
 
-# 启动时初始化
-@app.on_event("startup")
-def startup_event():
-    init_scraper()
-
-# 关闭时清理资源
-@app.on_event("shutdown")
-def shutdown_event():
-    global scraper
-    if scraper:
-        scraper.close()
-
-# 根路径路由 - 重定向到文档页面
-@app.get("/", response_class=RedirectResponse)
-async def root():
-    return RedirectResponse(url="/docs")
-
-# 欢迎页面
-@app.get("/welcome", response_class=HTMLResponse)
-async def welcome():
-    html_content = """
-    <!DOCTYPE html>
-    <html>
-        <head>
-            <title>小红书内容抓取API</title>
-            <style>
-                body {
-                    font-family: Arial, sans-serif;
-                    max-width: 800px;
-                    margin: 0 auto;
-                    padding: 20px;
-                    line-height: 1.6;
-                }
-                h1 {
-                    color: #FF2442; /* 小红书红色 */
-                }
-                .endpoints {
-                    background-color: #f5f5f5;
-                    padding: 15px;
-                    border-radius: 5px;
-                    margin: 20px 0;
-                }
-                code {
-                    background-color: #eee;
-                    padding: 2px 5px;
-                    border-radius: 3px;
-                }
-                a {
-                    color: #FF2442;
-                    text-decoration: none;
-                }
-                a:hover {
-                    text-decoration: underline;
-                }
-            </style>
-        </head>
-        <body>
-            <h1>小红书内容抓取API</h1>
-            <p>这是一个用于抓取小红书帖子内容和图片的API服务。</p>
-            
-            <div class="endpoints">
-                <h2>可用端点：</h2>
-                <ul>
-                    <li><code>GET /health</code> - 健康检查</li>
-                    <li><code>POST /login</code> - 登录小红书</li>
-                    <li><code>POST /scrape</code> - 抓取帖子内容</li>
-                </ul>
-            </div>
-            
-            <p>查看API文档：</p>
-            <ul>
-                <li><a href="/docs">Swagger UI</a></li>
-                <li><a href="/redoc">ReDoc</a></li>
-            </ul>
-            
-            <p>请先使用 <code>POST /login</code> 端点登录，然后再使用 <code>POST /scrape</code> 端点抓取内容。</p>
-        </body>
-    </html>
-    """
-    return html_content
-
-# 健康检查端点
 @app.get("/health")
 def health_check():
-    return {"status": "ok", "timestamp": time.time()}
+    """Health check endpoint"""
+    return {"status": "ok"}
 
-# 提取URL的辅助函数
-def process_url(url_text):
-    # 如果是分享文本，提取URL
-    extracted_url = extract_xiaohongshu_url(url_text)
-    if extracted_url:
-        return extracted_url
-    # 如果是直接URL，检查并格式化
-    if not url_text.startswith('http'):
-        return 'https://' + url_text
-    return url_text
-
-# 抓取内容端点
-@app.post("/scrape", response_model=ScrapeResponse)
-async def scrape_post(request: ScrapeRequest, background_tasks: BackgroundTasks):
-    init_scraper()  # 确保爬虫已初始化
+@app.post("/extract", response_model=Dict[str, Any])
+def extract_content(request: XHSRequest):
+    """
+    Extract content from a Xiaohongshu URL.
+    Returns title, description, images, and other metadata.
+    """
+    result = extract_xhs_content(request.url)
     
-    try:
-        # 处理URL
-        url = process_url(request.url)
-        if not url:
-            raise HTTPException(status_code=400, detail="无效的URL或分享文本")
-        
-        # 获取锁以确保同一时间只有一个请求在使用爬虫
-        with scraper_lock:
-            # 执行抓取
-            result = scraper.scrape_post(url)
-            
-            if not result:
-                return ScrapeResponse(
-                    title="",
-                    content="",
-                    image_count=0,
-                    image_info=[],
-                    success=False,
-                    message="抓取失败，请检查URL是否有效或尝试重新登录"
-                )
-            
-            # 构建图片信息
-            image_info = []
-            for i, (img_url, local_path) in enumerate(zip(result['image_urls'], result.get('downloaded_files', []))):
-                image_info.append(ImageInfo(url=img_url, local_path=local_path))
-            
-            # 如果请求中指定了保存JSON，则在后台保存
-            if request.save_to_json:
-                background_tasks.add_task(save_to_json, result)
-            
-            return ScrapeResponse(
-                title=result['title'],
-                content=result['content'],
-                image_count=len(result['image_urls']),
-                image_info=image_info,
-                output_directory=result.get('output_dir', ''),
-                success=True,
-                message="抓取成功"
-            )
+    if not result or "error" in result:
+        raise HTTPException(status_code=400, detail=result.get("error", "Failed to extract content"))
     
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"抓取过程中出错: {str(e)}")
-
-# 后台保存JSON文件
-def save_to_json(data, filename='xiaohongshu_content.json'):
-    try:
-        with open(filename, 'w', encoding='utf-8') as f:
-            json.dump(data, f, ensure_ascii=False, indent=4)
-    except Exception as e:
-        print(f"保存文件时出错: {e}")
-
-# 登录端点
-@app.post("/login")
-async def login():
-    init_scraper()  # 确保爬虫已初始化
+    # Process the result to remove binary content that can't be serialized to JSON
+    if "images" in result and result["images"]:
+        for image in result["images"]:
+            # Remove binary content from response
+            if "content" in image:
+                del image["content"]
     
-    try:
-        with scraper_lock:
-            success = scraper.login()
-            if success:
-                return {"success": True, "message": "登录成功"}
-            else:
-                return {"success": False, "message": "登录失败，请重试"}
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"登录过程中出错: {str(e)}")
+    return result
 
-# 主程序入口
 if __name__ == "__main__":
     uvicorn.run("api:app", host="0.0.0.0", port=8000, reload=True) 

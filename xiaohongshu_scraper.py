@@ -129,18 +129,30 @@ class XiaohongshuScraper:
             print("\n请登录小红书...")
             self.driver.get('https://www.xiaohongshu.com')
             
-            # 等待用户手动登录
-            print("请在浏览器中手动登录，登录成功后按回车继续...")
-            input()
+            # 等待用户手动登录 - 在API中这需要用户通过浏览器手动登录
+            print("等待小红书网站加载，请稍后...")
+            time.sleep(5)
             
-            # 保存cookies
-            cookies = self.driver.get_cookies()
-            with open('xiaohongshu_cookies.json', 'w') as f:
-                json.dump(cookies, f)
-            
-            self.is_logged_in = True
-            print("登录成功！")
-            return True
+            # 检查是否有登录按钮
+            try:
+                # 判断是否已经登录
+                if "用户登录" in self.driver.page_source or "登录" in self.driver.page_source:
+                    print("请在浏览器中手动登录，此处API需要单独处理登录流程")
+                    return False
+                else:
+                    # 已经登录成功
+                    self.is_logged_in = True
+                    print("登录成功！")
+                    
+                    # 保存cookies
+                    cookies = self.driver.get_cookies()
+                    with open('xiaohongshu_cookies.json', 'w') as f:
+                        json.dump(cookies, f)
+                    
+                    return True
+            except Exception as e:
+                print(f"检查登录状态时出错: {str(e)}")
+                return False
             
         except Exception as e:
             print(f"登录过程中出错: {str(e)}")
@@ -253,59 +265,4 @@ def save_to_file(data, filename='xiaohongshu_content.json'):
             json.dump(data, f, ensure_ascii=False, indent=4)
         print(f"数据已保存到 {filename}")
     except Exception as e:
-        print(f"保存文件时出错: {e}")
-
-def main():
-    print("小红书内容抓取工具 (Selenium版本)")
-    print("=" * 40)
-    print("\n支持的链接格式：")
-    print("1. 直接的URL链接")
-    print("2. 手机分享的完整文本")
-    print("例如：'34 某用户发布了一篇小红书笔记，快来看吧！😆 tnk9xxx 😆 http://xhslink.com/a/xxx'")
-    
-    # 创建主输出目录
-    os.makedirs('xiaohongshu_posts', exist_ok=True)
-    
-    scraper = None
-    try:
-        scraper = XiaohongshuScraper()
-        
-        while True:
-            url = input("\n请输入小红书URL或分享文本 (输入q退出): ")
-            if url.lower() == 'q':
-                break
-                
-            # 尝试提取URL
-            extracted_url = extract_xiaohongshu_url(url)
-            if extracted_url:
-                url = extracted_url
-            elif not url.startswith('http'):
-                url = 'https://' + url
-            
-            print("\n开始抓取内容...")
-            result = scraper.scrape_post(url)
-            
-            if result:
-                print("\n抓取结果:")
-                print(f"标题: {result['title']}")
-                print(f"\n内容: {result['content']}")
-                print(f"\n找到 {len(result['image_urls'])} 张图片")
-                print(f"图片已保存到目录: {result['output_dir']}")
-                
-                save = input("\n是否保存元数据到JSON文件？(y/n): ").lower()
-                if save == 'y':
-                    save_to_file(result)
-            
-            cont = input("\n是否继续抓取其他帖子？(y/n): ").lower()
-            if cont != 'y':
-                break
-                
-    except Exception as e:
-        print(f"程序运行出错: {e}")
-    finally:
-        if scraper:
-            scraper.close()
-            print("\n浏览器已关闭")
-
-if __name__ == "__main__":
-    main() 
+        print(f"保存文件时出错: {e}") 

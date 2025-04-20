@@ -4,30 +4,42 @@ __pycache__/
 *$py.class
 *.so
 .Python
-env/
-build/
-develop-eggs/
-dist/
-downloads/
-eggs/
-.eggs/
-lib/
-lib64/
-parts/
-sdist/
-var/
-*.egg-info/
-.installed.cfg
-*.egg
-
-# Virtual Environment
 venv/
+.venv/
 ENV/
 env/
+env.bak/
+venv.bak/
+pythonenv*
+.pytest_cache/
 
-# Project specific
+# 日志
 *.log
+
+# 本地配置
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# 敏感信息
+*.pem
+*.key
+*_credentials.json
+*_config.json
 xiaohongshu_cookies.json
+
+# 系统文件
+.DS_Store
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+
+# 数据文件
+*.db
+*.sqlite
+*.sqlite3
 xiaohongshu_content.json
 xiaohongshu_posts/
 
@@ -35,8 +47,4 @@ xiaohongshu_posts/
 .idea/
 .vscode/
 *.swp
-*.swo
-
-# OS specific
-.DS_Store
-Thumbs.db 
+*.swo 

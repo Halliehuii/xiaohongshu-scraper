@@ -1,87 +1,105 @@
-# 小红书内容抓取工具
+# 小红书内容抓取API
 
-一个基于 Selenium 的自动化工具，用于抓取小红书帖子内容和图片。支持命令行和 API 两种使用方式。
+这是一个基于FastAPI构建的小红书内容抓取API，可以抓取小红书帖子的标题、内容和图片。
 
-## 主要功能
+## 功能特点
 
-- 自动登录小红书（首次使用需手动登录，之后自动保存 cookies）
-- 抓取帖子标题、正文内容和图片
-- 自动下载帖子中的所有图片
-- 支持手机分享文本中的链接提取
-- 将内容保存为 JSON 格式（可选）
-- 提供 RESTful API 接口
+- 支持抓取小红书帖子内容
+- 自动下载帖子中的图片
+- 提供RESTful API接口
+- 支持手机分享格式的链接提取
 
-## 使用方法
+## 安装
 
-### 环境准备
+1. 克隆仓库：
 
 ```bash
-# 创建虚拟环境
-python -m venv venv
+git clone <仓库地址>
+cd <仓库目录>
+```
 
-# 激活虚拟环境
-# Windows:
-venv\Scripts\activate
-# Mac/Linux:
-source venv/bin/activate
+2. 安装依赖：
 
-# 安装依赖
+```bash
 pip install -r requirements.txt
 ```
 
-### 命令行模式
+3. 确保已安装Chrome浏览器。
+
+## 使用方法
+
+1. 启动API服务器：
 
 ```bash
-# 运行脚本
-python xiaohongshu_scraper.py
+uvicorn app:app --reload
 ```
 
-### API 模式
+2. 服务器将在 http://127.0.0.1:8000 上运行
 
-```bash
-# 启动 API 服务
-python api.py
+3. 访问API文档：http://127.0.0.1:8000/docs
+
+## API端点
+
+### 1. 抓取帖子内容
+
+**请求**：
+
+```
+POST /scrape/
 ```
 
-API 服务默认在 http://localhost:8000 运行，包含以下端点：
+**参数**：
 
-- `GET /health` - 健康检查
-- `POST /login` - 登录小红书
-- `POST /scrape` - 抓取帖子内容
-
-#### API 示例
-
-1. 登录接口：
-```bash
-curl -X POST "http://localhost:8000/login"
+```json
+{
+  "url": "http://xhslink.com/a/IGTNc5Db7WEab",  // 小红书分享链接或直接URL
+  "save_metadata": true  // 是否保存元数据到JSON文件
+}
 ```
 
-2. 抓取内容接口：
-```bash
-curl -X POST "http://localhost:8000/scrape" \
-  -H "Content-Type: application/json" \
-  -d '{"url": "http://xhslink.com/a/IGTNc5Db7WEab", "save_to_json": true}'
+**响应**：
+
+```json
+{
+  "title": "帖子标题",
+  "content": "帖子内容",
+  "image_urls": ["图片URL1", "图片URL2", ...],
+  "downloaded_files": ["本地文件路径1", "本地文件路径2", ...],
+  "output_dir": "输出目录路径",
+  "saved_metadata_path": "元数据JSON文件路径"
+}
 ```
 
-3. 访问 API 文档：
-   - Swagger UI: http://localhost:8000/docs
-   - ReDoc: http://localhost:8000/redoc
+### 2. 登录小红书
 
-### 输入格式
+**请求**：
 
-支持以下输入格式：
-1. 直接输入小红书URL链接
-2. 粘贴手机分享的完整文本，例如：
-   "34 某用户发布了一篇小红书笔记，快来看吧！😆 tnk9xxx 😆 http://xhslink.com/a/xxx"
+```
+POST /login/
+```
 
-### 图片存储
+**响应**：
 
-- 所有图片会自动保存在 `xiaohongshu_posts/帖子标题/` 目录下
-- 图片按顺序编号（001.jpg, 002.jpg 等）
+```json
+{
+  "message": "登录成功"
+}
+```
 
 ## 注意事项
 
-- 首次使用需要手动登录小红书账号
-- 脚本会自动保存 cookies 以便后续使用
-- 需要稳定的网络连接
-- API 模式下，一次只能处理一个请求（使用锁机制） 
+1. 首次使用时需要手动登录小红书，登录成功后会保存cookies以便后续使用。
+2. 如遇到登录问题，请在浏览器中手动登录。
+3. 抓取结果会保存在`xiaohongshu_posts`目录下。
+
+## 技术栈
+
+- FastAPI
+- Selenium
+- Chrome WebDriver
+- Pydantic
+- Requests
+
+## 许可证
+
+[MIT License](LICENSE) 
